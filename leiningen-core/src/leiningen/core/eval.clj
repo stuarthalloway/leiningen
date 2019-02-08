@@ -230,6 +230,19 @@
           [(str "-Xbootclasspath/a:" classpath-string)]
           ["-classpath" classpath-string]))))
 
+;; HACKY DEMO of an idea -- do not add this to the offical leiningen!
+;; This appears to improve e.g. "lein run"
+;; but not e.g. "lein test", which does its own exception catching and
+;; printing before bubbling out to here
+(defn wrap-with-1-10-exception-printing
+  [form]
+  `(try
+    ~form
+    (catch Throwable t#
+      (print (-> t# Throwable->map clojure.main/ex-triage clojure.main/ex-str))
+      (flush)
+      (System/exit 1))))
+
 (defn shell-command
   "Calculate vector of strings needed to evaluate form in a project subprocess."
   [project form]
@@ -241,7 +254,7 @@
           (binding [*print-dup* *eval-print-dup*]
             (pr-str (when-not (System/getenv "LEIN_FAST_TRAMPOLINE")
                       `(.deleteOnExit (File. ~(.getCanonicalPath init-file))))
-                    form)))
+                    (wrap-with-1-10-exception-printing form))))
     `(~(or (:java-cmd project) (System/getenv "JAVA_CMD") "java")
       ~@(classpath-arg project)
       ~@(get-jvm-args project)
